@@ -388,12 +388,12 @@ goog.fx.Dragger.prototype.setPreventMouseDown = function(preventMouseDown) {
 
 /** @override */
 goog.fx.Dragger.prototype.disposeInternal = function() {
+  this.cleanUpAfterDragging_();
   goog.fx.Dragger.superClass_.disposeInternal.call(this);
   goog.events.unlisten(
       this.handle,
       [goog.events.EventType.TOUCHSTART, goog.events.EventType.MOUSEDOWN],
       this.startDrag, false, this);
-  this.cleanUpAfterDragging_();
 
   this.target = null;
   this.handle = null;
