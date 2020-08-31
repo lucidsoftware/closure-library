@@ -351,7 +351,8 @@ goog.Disposable.prototype.disposeInternal = function() {
   }
   if (this.registeredDisposables_) {
     while (this.registeredDisposables_.length) {
-      this.registeredDisposables_.shift().dispose();
+      const disposable = this.registeredDisposables_.shift();
+      disposable.isDisposed() || disposable.dispose();
     }
   }
 };
