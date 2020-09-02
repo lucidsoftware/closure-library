@@ -215,10 +215,11 @@ goog.Disposable.prototype.dispose = function() {
     // causes this to fail.
     if (goog.DEBUG && !COMPILED) {
       // The only thing a disposed object can do is return true from
-      // isDisposed().
+      // isDisposed() or a harmless `dispose()` call.
       let whitelist = {
         isDisposed: 1,
         disposed_: 1,
+        dispose: 1,
       };
 
       // Keep a reference to the old values, so we can determine what object is
