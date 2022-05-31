@@ -575,8 +575,9 @@ goog.testing.MockClock.prototype.setTimeout_ = function(
   }
   this.timeoutsMade_++;
   var args = Array.prototype.slice.call(arguments, 2);
+  const callback = args.length ? function() { return funcToCall.apply(this, args); } : funcToCall;
   this.scheduleFunction_(
-      goog.testing.MockClock.nextId, function() { return funcToCall.apply(this, args); }, millis, false);
+      goog.testing.MockClock.nextId, callback, millis, false);
   return goog.testing.MockClock.nextId++;
 };
 
@@ -594,8 +595,9 @@ goog.testing.MockClock.prototype.setInterval_ = function(
   var millis = opt_millis || 0;
   this.timeoutsMade_++;
   var args = Array.prototype.slice.call(arguments, 2);
+  const callback = args.length ? function() { return funcToCall.apply(this, args); } : funcToCall;
   this.scheduleFunction_(
-      goog.testing.MockClock.nextId, function() { return funcToCall.apply(this, args); }, millis, true);
+      goog.testing.MockClock.nextId, callback, millis, true);
   return goog.testing.MockClock.nextId++;
 };
 
