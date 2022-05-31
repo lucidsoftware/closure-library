@@ -50,7 +50,7 @@ goog.global =
     //   without setting `this` properly.
     // Note that base.js can't usefully be imported as an ES module, but it may
     // be compiled into bundles that are loadable as ES modules.
-    this ||
+    (typeof globalThis !== 'undefined' && globalThis) || this ||
     // https://developer.mozilla.org/en-US/docs/Web/API/Window/self
     // For in-page browser environments and workers.
     self;
