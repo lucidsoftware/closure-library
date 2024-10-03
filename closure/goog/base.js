@@ -840,7 +840,9 @@ goog.require = function(namespace) {
     // If the object already exists we do not need to do anything.
     if (goog.isProvided_(namespace)) {
       if (goog.isInModuleLoader_()) {
-        return goog.module.getInternal_(namespace);
+        const exports = goog.module.getInternal_(namespace);
+        exports.__hhmrDependents?.add(goog.moduleLoaderState_.moduleName);
+        return exports;
       }
     } else if (goog.ENABLE_DEBUG_LOADER) {
       var moduleLoaderState = goog.moduleLoaderState_;
@@ -1103,6 +1105,67 @@ goog.workaroundSafari10EvalBug = function(moduleDef) {
       '})();\n';
 };
 
+/** true if a module is being hot reloaded */
+goog.__HHMR_RELOADING = false;
+
+/** @param {{moduleName: string, moduleContent?: string}[]} modules */
+goog.reloadModules = function(modules) {
+  const deps = new Set();
+  const depth = new WeakMap();
+  
+  function recurse(module, i = 1) {
+    if (deps.has(module)) {
+      if (i <= (depth.get(module) || 0)) {
+        return;
+      }
+    }
+
+    deps.add(module);
+    depth.set(module, i);
+
+    module.exports.__hhmrDependents.forEach((dep) => {
+      const module = goog.loadedModules_[dep];
+      recurse(module, i + 1);
+    });
+  }
+
+  // Determine all dependent modules and assign their depth for a topological sort.
+  modules.forEach(({moduleName, moduleContent}) => {
+    const module = goog.loadedModules_[moduleName];
+    if (!module) {
+      // Currently, this does not support defining new modules
+      return;
+    }
+
+    if (moduleContent) {
+      module.exports.__hhmrSource = moduleContent;
+    }
+
+    recurse(module);
+  });
+
+  const toReload = [...deps.values()].sort((m1, m2) => {
+    return depth.get(m1) - depth.get(m2);
+  });
+
+  toReload.forEach(oldModule => {
+    const oldModuleName = oldModule.exports.__hhmrModuleName;
+    delete goog.loadedModules_[oldModuleName];
+  
+    try {
+      goog.__HHMR_RELOADING = true;
+      goog.loadModule(oldModule.exports.__hhmrSource);
+    } finally {
+      goog.__HHMR_RELOADING = false;
+    }
+  
+    const newModule = goog.loadedModules_[oldModuleName]
+  
+    // In case anyone has saved a reference to the previous module
+    Object.assign(oldModule, newModule);
+  });
+}
+
 
 /**
  * @param {function(?):?|string} moduleDef The module definition.
@@ -1121,6 +1184,12 @@ goog.loadModule = function(moduleDef) {
       type: goog.ModuleType.GOOG
     };
     var exports;
+
+    // Precompile modules so that they can be quickly reloaded.
+    if (typeof moduleDef === 'string') {
+      moduleDef = goog.compileModule(moduleDef);
+    }
+
     if (goog.isFunction(moduleDef)) {
       exports = moduleDef.call(undefined, {});
     } else if (typeof moduleDef === 'string') {
@@ -1134,6 +1203,11 @@ goog.loadModule = function(moduleDef) {
     }
 
     var moduleName = goog.moduleLoaderState_.moduleName;
+
+    exports.__hhmrModuleName = moduleName;
+    exports.__hhmrSource = moduleDef;
+    exports.__hhmrDependents = new Set();
+
     if (typeof moduleName === 'string' && moduleName) {
       // Don't seal legacy namespaces as they may be used as a parent of
       // another namespace
@@ -1171,6 +1245,14 @@ goog.loadModuleFromSource_ = /** @type {function(string):?} */ (function() {
   eval(arguments[0]);
   return exports;
 });
+
+/** @param {string} moduleDef */
+goog.compileModule = function(moduleDef) {
+  return Function(`'use strict';
+  var exports = {};
+  ${moduleDef}
+  ;return exports;`);
+}
 
 
 /**
